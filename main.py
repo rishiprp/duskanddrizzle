@@ -32,6 +32,8 @@ def init():
     CREATE TABLE IF NOT EXISTS expenses(id SERIAL PRIMARY KEY, name TEXT, category TEXT, amount DOUBLE PRECISION, date TEXT, method TEXT, notes TEXT)""".split(";"):
         c.execute(q)
     c.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT")
+    c.execute("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE status='cancelled')")
+    c.execute("DELETE FROM orders WHERE status='cancelled'")
     if not c.execute("SELECT 1 FROM products").fetchone():
         for n in ["Chocolate Strawberry","Chocolate Pineapple","Cold Coco","Cold Coffee","Strawberry Iced Latte","Brownie Strawberry Bowl"]:
             c.execute("INSERT INTO products(name,price,cost) VALUES(?,?,?)",(n,0,0))
@@ -90,7 +92,7 @@ def new_order(o: Order):
     c = db()
     try:
         dup = c.execute("SELECT id FROM orders WHERE idem=?",(o.idem,)).fetchone()
-        if dup: return {"order_no": dup[0], "duplicate": True}
+        if dup: return {"order_no": c.execute("SELECT COUNT(*) FROM orders WHERE id<=?",(dup[0],)).fetchone()[0], "duplicate": True}
         lines, sub = [], 0
         for i in o.items:
             p = c.execute("SELECT * FROM products WHERE id=? AND active=1",(i.product_id,)).fetchone()
@@ -99,28 +101,31 @@ def new_order(o: Order):
         if o.discount < 0 or o.discount > sub: raise HTTPException(400, "Invalid discount")
         now = datetime.now(IST).replace(tzinfo=None); day = now.strftime("%Y%m%d")
         n = c.execute("SELECT COUNT(*) FROM orders WHERE order_no LIKE ?",(f"DD-{day}-%",)).fetchone()[0] + 1
-        no = f"DD-{day}-{n:04d}"
+        no = f"DD-{day}-{secrets.token_hex(4)}"
         cur = c.execute("INSERT INTO orders(order_no,idem,created_at,subtotal,discount,total,payment,customer,note) VALUES(?,?,?,?,?,?,?,?,?) RETURNING id",
             (no,o.idem,now.isoformat(timespec="seconds"),sub,o.discount,round(sub-o.discount,2),o.payment,o.customer,o.note)).fetchone()[0]
         for p,q in lines:
             c.execute("INSERT INTO order_items(order_id,product_id,name,qty,price,cost) VALUES(?,?,?,?,?,?)",(cur,p["id"],p["name"],q,p["price"],p["cost"]))
-        c.commit(); return {"order_no": cur, "total": round(sub-o.discount,2)}
+        c.commit(); return {"order_no": c.execute("SELECT COUNT(*) FROM orders WHERE id<=?",(cur,)).fetchone()[0], "total": round(sub-o.discount,2)}
     except Exception:
         c.rollback(); raise
     finally: c.close()
 
 @app.get("/api/orders", dependencies=[Depends(auth)])
 def orders(q: str = "", day: str = ""):
-    c = db()
-    rows = c.execute("SELECT * FROM orders WHERE (? = '' OR CAST(id AS TEXT) = ?) AND created_at LIKE ? ORDER BY id DESC LIMIT 1000",(q.strip(), q.strip(), f"{day}%")).fetchall()
+    c = db(); items = {}
+    for i in c.execute("SELECT order_id,name,qty,price FROM order_items ORDER BY id"):
+        items.setdefault(i["order_id"], []).append({"name": i["name"], "qty": i["qty"], "price": i["price"]})
     out = []
-    for r in rows:
-        d = dict(r); d["items"] = [dict(i) for i in c.execute("SELECT name,qty,price FROM order_items WHERE order_id=?",(r["id"],))]; out.append(d)
-    c.close(); return out
+    for n, r in enumerate(c.execute("SELECT * FROM orders ORDER BY id").fetchall(), 1):
+        if q.strip() and str(n) != q.strip(): continue
+        if day and not r["created_at"].startswith(day): continue
+        d = dict(r); d["no"] = n; d["items"] = items.get(r["id"], []); out.append(d)
+    c.close(); return out[::-1]
 
 @app.post("/api/orders/{oid}/cancel", dependencies=[Depends(auth)])
 def cancel(oid: int):
-    c = db(); c.execute("UPDATE orders SET status='cancelled' WHERE id=?",(oid,)); c.commit(); c.close(); return {"ok": True}
+    c = db(); c.execute("DELETE FROM order_items WHERE order_id=?",(oid,)); c.execute("DELETE FROM orders WHERE id=?",(oid,)); c.commit(); c.close(); return {"ok": True}
 
 @app.get("/api/expenses", dependencies=[Depends(auth)])
 def expenses():
@@ -159,7 +164,7 @@ def summary(start: str, end: str):
 def export():
     c = db(); buf = io.StringIO(); w = csv.writer(buf)
     w.writerow(["Order","Date","Subtotal","Discount","Total","Payment","Customer","Status"])
-    for r in c.execute("SELECT id,created_at,subtotal,discount,total,payment,customer,status FROM orders"): w.writerow(list(r))
+    for r in c.execute("SELECT ROW_NUMBER() OVER (ORDER BY id),created_at,subtotal,discount,total,payment,customer,status FROM orders ORDER BY id"): w.writerow(list(r))
     c.close(); buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv")
 
