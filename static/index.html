@@ -3,16 +3,23 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{--black:#0A0908;--sienna:#49111C;--cult:#F2F4F3;--grullo:#A9927D;--umber:#5E503F}
-*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--cult);color:var(--black);display:flex;min-height:100vh}
+*{box-sizing:border-box}html,body{max-width:100%;overflow-x:hidden}
+body{margin:0;font:15px system-ui,sans-serif;background:var(--cult);color:var(--black);display:flex;min-height:100vh}
 nav{background:var(--black);width:200px;padding:16px 8px;flex-shrink:0}nav h2{color:var(--grullo);margin:0 8px 16px;font-size:18px}
 nav a{display:block;color:var(--cult);padding:10px 12px;border-radius:6px;cursor:pointer}nav a.on{background:var(--sienna)}
-main{flex:1;padding:20px;min-width:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:12px 0}
-.card{background:#fff;border-radius:8px;padding:14px;border:1px solid #ddd}.card b{display:block;font-size:20px;color:var(--sienna)}
+main{flex:1;padding:14px;min-width:0;width:100%}h2{margin:6px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0}.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.card{background:#fff;border-radius:8px;padding:12px;border:1px solid #ddd}.card b{display:block;font-size:19px;color:var(--sienna)}
 button{background:var(--sienna);color:#fff;border:0;border-radius:6px;padding:10px 14px;cursor:pointer;font-size:15px}button.alt{background:var(--umber)}
-input,select{padding:9px;border:1px solid var(--grullo);border-radius:6px;font-size:15px;max-width:100%}
-table{width:100%;border-collapse:collapse;background:#fff}td,th{padding:8px;border-bottom:1px solid #eee;text-align:left}
-.pbtn{padding:18px;font-size:16px;background:var(--umber);margin:4px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
-#login{margin:auto;width:300px}@media(max-width:700px){body{flex-direction:column}nav{width:100%;display:flex;overflow:auto}nav h2{display:none}nav a{white-space:nowrap}}
+input,select{padding:9px;border:1px solid var(--grullo);border-radius:6px;font-size:15px;max-width:100%;min-width:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.row input,.row select{flex:1 1 130px}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;background:#fff}td,th{padding:8px;border-bottom:1px solid #eee;text-align:left}
+.pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+.pc{background:#fff;border:1px solid #ddd;border-radius:10px;overflow:hidden;cursor:pointer;position:relative;text-align:center}
+.pc .im{aspect-ratio:1;background:var(--umber) center/cover;display:flex;align-items:center;justify-content:center;color:var(--grullo);font-size:38px}
+.pc b{font-size:14px;padding:6px 6px 0;color:var(--black)}.pc span{display:block;padding:2px 6px 8px;color:var(--sienna);font-weight:700}
+.badge{position:absolute;top:6px;right:6px;background:var(--sienna);color:#fff;border-radius:12px;padding:2px 10px;font-weight:700}
+#login{margin:auto;width:min(320px,90%)}@media(max-width:700px){body{flex-direction:column}nav{width:100%;display:flex;overflow-x:auto;padding:8px}nav h2{display:none}nav a{white-space:nowrap}}
 </style></head><body>
 <div id="login" class="card"><h2>Dusk &amp; Drizzle</h2><div class="row"><input id="u" placeholder="Username"><input id="p" type="password" placeholder="Password"><button onclick="login()">Sign in</button></div><div id="lerr" style="color:red"></div></div>
 <nav style="display:none"><h2>Dusk &amp; Drizzle</h2></nav><main style="display:none"></main>
@@ -26,8 +33,8 @@ async function login(){const r=await fetch("/api/login",{method:"POST",headers:{
  if(!r.ok)return $("#lerr").textContent="Wrong credentials";T=(await r.json()).token;localStorage.t=T;start()}
 function logout(){localStorage.t="";location.reload()}
 function start(){if(!T)return;$("#login").style.display="none";$("nav").style.display=$("main").style.display="";
- $("nav").innerHTML='<h2>Dusk &amp; Drizzle</h2>'+["Dashboard","New Order","Orders","Products","Expenses"].map(v=>`<a onclick="go('${v}')" class="${v==view?"on":""}">${v}</a>`).join("")+'<a onclick="logout()">Logout</a>';go(view)}
-function go(v){view=v;start2()}function start2(){$("nav").querySelectorAll("a").forEach(a=>a.classList.toggle("on",a.textContent==view));({Dashboard,"New Order":NewOrder,Orders,Products,Expenses})[view]()}
+ $("nav").innerHTML='<h2>Dusk &amp; Drizzle</h2>'+["Dashboard","New Order","Order History","Products","Expenses"].map(v=>`<a onclick="go('${v}')" class="${v==view?"on":""}">${v}</a>`).join("")+'<a onclick="logout()">Logout</a>';go(view)}
+function go(v){view=v;start2()}function start2(){$("nav").querySelectorAll("a").forEach(a=>a.classList.toggle("on",a.textContent==view));({Dashboard,"New Order":NewOrder,"Order History":Orders,Products,Expenses})[view]()}
 function range(k){const t=new Date(),s=new Date(t),e=new Date(t),dow=(t.getDay()+6)%7;
  if(k=="yesterday"){s.setDate(s.getDate()-1);e.setDate(e.getDate()-1)}
  if(k=="week")s.setDate(s.getDate()-dow);if(k=="month")s.setDate(1);if(k=="year"){s.setMonth(0,1)}return[iso(s),iso(e)]}
@@ -36,38 +43,50 @@ async function Dashboard(a="today",cs,ce){const[s,e]=a=="custom"?[cs,ce]:range(a
  $("main").innerHTML=`<div class="row">${["today","yesterday","week","month","year"].map(x=>`<button class="alt" onclick="Dashboard('${x}')">${x}</button>`).join("")}
  <input type="date" id="cs" value="${s}"><input type="date" id="ce" value="${e}"><button onclick="Dashboard('custom',cs.value,ce.value)">Apply</button></div>
  <div class="grid">${K.map(([k,v])=>`<div class="card">${k}<b>${v}</b></div>`).join("")}</div>
- <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div></div>`;
+ <div class="grid g2"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div></div>`;
  charts.forEach(c=>c.destroy());const L=d.series.map(x=>D(x.d));
  charts=[new Chart(c1,{type:"bar",data:{labels:L,datasets:[{label:"Sales",data:d.series.map(x=>x.sales),backgroundColor:"#49111C"},{label:"Expenses",data:d.series.map(x=>x.expenses),backgroundColor:"#A9927D"}]}}),
  new Chart(c2,{type:"line",data:{labels:L,datasets:[{label:"Daily profit",data:d.series.map(x=>x.profit),borderColor:"#5E503F"}]}})]}
-async function NewOrder(){const P=(await(await api("/products")).json()).filter(p=>p.active);
- const tot=()=>P.reduce((s,p)=>s+(cart[p.id]||0)*p.price,0);
- $("main").innerHTML=`<h2>New Order</h2><div>${P.map(p=>`<button class="pbtn" onclick="cart[${p.id}]=(cart[${p.id}]||0)+1;NewOrder()">${p.name}<br>${R(p.price)}</button>`).join("")}</div>
- <table>${P.filter(p=>cart[p.id]).map(p=>`<tr><td>${p.name}</td><td><button onclick="cart[${p.id}]--;if(!cart[${p.id}])delete cart[${p.id}];NewOrder()">−</button> ${cart[p.id]} </td><td>${R(cart[p.id]*p.price)}</td></tr>`).join("")}</table>
- <div class="row"><input id="disc" type="number" min="0" placeholder="Discount ₹" value="0"><select id="pay"><option>Cash</option><option>UPI</option><option>Other</option></select>
- <input id="cust" placeholder="Customer (optional)"><input id="note" placeholder="Note (optional)"></div>
- <h3>Subtotal ${R(tot())}</h3><button id="sub" onclick="submitOrder()">Submit Order</button>`}
-async function submitOrder(){const items=Object.entries(cart).map(([k,v])=>({product_id:+k,qty:v}));$("#sub").disabled=true;
- try{const r=await(await api("/orders","POST",{idem,items,discount:+disc.value||0,payment:pay.value,customer:cust.value||null,note:note.value||null})).json();
- alert("Order saved: "+r.order_no);cart={};idem=crypto.randomUUID();NewOrder()}catch{$("#sub").disabled=false}}
-async function Orders(q="",day=""){const o=await(await api(`/orders?q=${q}&day=${day}`)).json();
- $("main").innerHTML=`<h2>Orders</h2><div class="row"><input id="q" placeholder="Order ID" value="${q}"><input id="dy" type="date" value="${day}"><button onclick="Orders(q.value,dy.value)">Search</button><button class="alt" onclick="exportCsv()">Export CSV</button></div>
- <table><tr><th>ID</th><th>Date</th><th>Items</th><th>Total</th><th>Pay</th><th></th></tr>${o.map(x=>`<tr style="${x.status=="cancelled"?"opacity:.5":""}"><td>${x.order_no}</td><td>${D(x.created_at)} ${x.created_at.slice(11,16)}</td><td>${x.items.map(i=>i.qty+"× "+i.name).join(", ")}</td><td>${R(x.total)}</td><td>${x.payment}</td>
- <td>${x.status=="completed"?`<button class="alt" onclick="cancelO(${x.id})">Cancel</button>`:"cancelled"} <button onclick='receipt(${JSON.stringify(x)})'>Receipt</button></td></tr>`).join("")}</table>`}
+let PROD=null,F={disc:"0",pay:"Cash",cust:"",note:""},OL=[];
+const subT=()=>PROD.reduce((s,p)=>s+(cart[p.id]||0)*p.price,0);
+function upd(){const e=$("#tt");if(e)e.textContent=R(Math.max(0,subT()-(+F.disc||0)))}
+function addC(id){cart[id]=(cart[id]||0)+1;NewOrder()}
+function decC(id){cart[id]--;if(!cart[id])delete cart[id];NewOrder()}
+async function NewOrder(){if(!PROD)PROD=(await(await api("/products")).json()).filter(p=>p.active);const P=PROD;
+ $("main").innerHTML=`<h2>New Order</h2><div class="pg">${P.map(p=>`<div class="pc" onclick="addC(${p.id})"><div class="im" style="${p.image?`background-image:url(${p.image})`:""}">${p.image?"":p.name[0]}</div>${cart[p.id]?`<div class="badge">${cart[p.id]}</div>`:""}<b>${p.name}</b><span>${R(p.price)}</span></div>`).join("")}</div>
+ <div class="tw"><table>${P.filter(p=>cart[p.id]).map(p=>`<tr><td>${p.name}</td><td style="white-space:nowrap"><button onclick="decC(${p.id})">−</button> ${cart[p.id]} <button onclick="addC(${p.id})">+</button></td><td>${R(cart[p.id]*p.price)}</td></tr>`).join("")}</table></div>
+ <div class="row"><input type="number" min="0" inputmode="decimal" placeholder="Discount ₹" value="${F.disc}" oninput="F.disc=this.value;upd()"><select onchange="F.pay=this.value">${["Cash","UPI","Other"].map(x=>`<option ${x==F.pay?"selected":""}>${x}</option>`).join("")}</select>
+ <input placeholder="Customer (optional)" value="${F.cust}" oninput="F.cust=this.value"><input placeholder="Note (optional)" value="${F.note}" oninput="F.note=this.value"></div>
+ <h3>Payable: <span id="tt"></span></h3><button id="sub" style="width:100%;padding:16px;font-size:17px" onclick="submitOrder()">Submit Order</button>`;upd()}
+async function submitOrder(){const items=Object.entries(cart).map(([k,v])=>({product_id:+k,qty:v}));if(!items.length)return alert("Add at least one item");$("#sub").disabled=true;
+ try{const r=await(await api("/orders","POST",{idem,items,discount:+F.disc||0,payment:F.pay,customer:F.cust||null,note:F.note||null})).json();
+ alert("Order #"+r.order_no+" saved");cart={};F={disc:"0",pay:"Cash",cust:"",note:""};idem=crypto.randomUUID();NewOrder()}catch{$("#sub").disabled=false}}
+async function Orders(q="",day=""){const o=await(await api(`/orders?q=${encodeURIComponent(q)}&day=${day}`)).json();OL=o;
+ const ok=o.filter(x=>x.status=="completed"),sum=ok.reduce((s,x)=>s+x.total,0);
+ $("main").innerHTML=`<h2>Order History</h2><div class="row"><input id="q" placeholder="Order No." inputmode="numeric" value="${q}"><input id="dy" type="date" value="${day}"><button onclick="Orders(q.value,dy.value)">Search</button><button class="alt" onclick="exportCsv()">Export CSV</button></div>
+ ${o.map(x=>`<div class="card" style="margin-bottom:8px;${x.status=="cancelled"?"opacity:.55":""}"><div class="row" style="justify-content:space-between;margin:0"><b>Order #${x.id}</b><span>${D(x.created_at)} ${x.created_at.slice(11,16)}</span></div>
+ <div style="margin:6px 0">${x.items.map(i=>i.qty+"× "+i.name).join(", ")}</div>
+ <div class="row" style="justify-content:space-between;margin:0"><b>${R(x.total)} · ${x.payment}</b><span>${x.status=="completed"?`<button class="alt" onclick="cancelO(${x.id})">Cancel</button>`:"cancelled"} <button onclick="receipt(${x.id})">Receipt</button></span></div></div>`).join("")}
+ <div class="card" style="background:var(--sienna);color:#fff"><div class="row" style="justify-content:space-between;margin:0"><span>Total of ${ok.length} orders</span><b style="font-size:21px;color:#fff">${R(sum)}</b></div></div>`}
 async function cancelO(id){if(confirm("Cancel this order?")){await api(`/orders/${id}/cancel`,"POST");Orders()}}
-function receipt(x){const w=open("","_blank");w.document.write(`<pre style="font:14px monospace">Dusk & Drizzle\n${x.order_no}  ${D(x.created_at)} ${x.created_at.slice(11,16)}\n\n${x.items.map(i=>`${i.qty} x ${i.name}  ₹${i.qty*i.price}`).join("\n")}\n\nDiscount ₹${x.discount}\nTOTAL ₹${x.total} (${x.payment})</pre>`);w.print()}
+function receipt(id){const x=OL.find(o=>o.id==id),w=open("","_blank");w.document.write(`<pre style="font:14px monospace">Dusk & Drizzle\nOrder #${x.id}  ${D(x.created_at)} ${x.created_at.slice(11,16)}\n\n${x.items.map(i=>`${i.qty} x ${i.name}  ₹${i.qty*i.price}`).join("\n")}\n\nDiscount ₹${x.discount}\nTOTAL ₹${x.total} (${x.payment})</pre>`);w.print()}
 async function exportCsv(){const b=await(await api("/export/orders.csv")).blob(),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="orders.csv";a.click()}
-async function Products(){const P=await(await api("/products")).json();
- $("main").innerHTML=`<h2>Products</h2><table><tr><th>Name</th><th>Category</th><th>Price ₹</th><th>Cost ₹</th><th>Active</th><th></th></tr>${P.map(p=>`<tr><td><input id="n${p.id}" value="${p.name}"></td><td><input id="c${p.id}" value="${p.category}" size=8></td>
- <td><input id="p${p.id}" type="number" value="${p.price}" style="width:80px"></td><td><input id="k${p.id}" type="number" value="${p.cost}" style="width:80px"></td><td><input id="a${p.id}" type="checkbox" ${p.active?"checked":""}></td>
- <td><button onclick="saveP(${p.id})">Save</button> <button class="alt" onclick="api('/products/${p.id}','DELETE').then(Products)">Delete</button></td></tr>`).join("")}</table>
- <h3>Add product</h3><div class="row"><input id="nn" placeholder="Name"><input id="nc" placeholder="Category" value="Drinks"><input id="np" type="number" placeholder="Price"><input id="nk" type="number" placeholder="Cost"><button onclick="addP()">Add</button></div>`}
-async function saveP(i){await api("/products/"+i,"PUT",{name:$("#n"+i).value,category:$("#c"+i).value,price:+$("#p"+i).value,cost:+$("#k"+i).value,active:$("#a"+i).checked});Products()}
-async function addP(){await api("/products","POST",{name:nn.value,category:nc.value,price:+np.value,cost:+nk.value});Products()}
+const IM={};
+function pick(id,f){if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,360/Math.max(im.width,im.height)),cv=document.createElement("canvas");cv.width=im.width*k;cv.height=im.height*k;cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height);
+ IM[id]=cv.toDataURL("image/jpeg",.75);const e=$("#im"+id);e.style.backgroundImage=`url(${IM[id]})`;e.textContent=""};im.src=r.result};r.readAsDataURL(f)}
+const pcard=p=>`<div class="card" style="margin-bottom:10px"><div class="row"><label style="width:84px;flex:none"><div id="im${p.id}" style="width:84px;height:84px;border-radius:8px;background:var(--umber) center/cover;${p.image?`background-image:url(${p.image})`:""};display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;text-align:center">${p.image?"":"Tap to add photo"}</div><input type="file" accept="image/*" hidden onchange="pick('${p.id}',this.files[0])"></label>
+ <div style="flex:1;min-width:150px"><input id="n${p.id}" placeholder="Name" value="${p.name}" style="width:100%;margin-bottom:6px"><input id="c${p.id}" placeholder="Category" value="${p.category}" style="width:100%"></div></div>
+ <div class="row"><input id="p${p.id}" type="number" inputmode="decimal" placeholder="Price ₹" value="${p.price}"><input id="k${p.id}" type="number" inputmode="decimal" placeholder="Cost ₹" value="${p.cost}"></div>
+ <div class="row"><label><input id="a${p.id}" type="checkbox" ${p.active?"checked":""}> Active</label>${p.id=="new"?`<button onclick="saveP('new')">Add product</button>`:`<button onclick="saveP(${p.id})">Save</button><button class="alt" onclick="delP(${p.id})">Delete</button>`}</div></div>`;
+async function Products(){PROD=null;const P=await(await api("/products")).json();
+ $("main").innerHTML=`<h2>Products</h2>${P.map(pcard).join("")}<h3>Add new product</h3>${pcard({id:"new",name:"",category:"Drinks",price:"",cost:"",active:true,image:""})}`}
+async function saveP(i){const b={name:$("#n"+i).value.trim(),category:$("#c"+i).value||"Drinks",price:+$("#p"+i).value||0,cost:+$("#k"+i).value||0,active:$("#a"+i).checked,image:IM[i]||null};
+ if(!b.name)return alert("Name required");await api(i=="new"?"/products":"/products/"+i,i=="new"?"POST":"PUT",b);delete IM[i];Products()}
+async function delP(i){if(confirm("Delete this product?")){await api("/products/"+i,"DELETE");Products()}}
 const CATS=["Raw Materials","Fruits","Chocolate and Syrup","Milk and Dairy Products","Packaging","Transportation","Stall Rent","Electricity","Marketing","Equipment","Other Expenses"];
 async function Expenses(){const E=await(await api("/expenses")).json();
  $("main").innerHTML=`<h2>Expenses</h2><div class="row"><input id="en" placeholder="Name"><select id="ec">${CATS.map(c=>`<option>${c}</option>`)}</select><input id="ea" type="number" placeholder="₹ Amount"><input id="ed" type="date" value="${iso(new Date())}"><select id="em"><option>Cash</option><option>UPI</option><option>Other</option></select><input id="eo" placeholder="Notes"><button onclick="addE()">Add</button></div>
- <table><tr><th>Date</th><th>Name</th><th>Category</th><th>Amount</th><th></th></tr>${E.map(e=>`<tr><td>${D(e.date)}</td><td>${e.name}</td><td>${e.category}</td><td>${R(e.amount)}</td><td><button class="alt" onclick="api('/expenses/${e.id}','DELETE').then(Expenses)">Delete</button></td></tr>`).join("")}</table>`}
+ <div class="tw"><table><tr><th>Date</th><th>Name</th><th>Category</th><th>Amount</th><th></th></tr>${E.map(e=>`<tr><td>${D(e.date)}</td><td>${e.name}</td><td>${e.category}</td><td>${R(e.amount)}</td><td><button class="alt" onclick="api('/expenses/${e.id}','DELETE').then(Expenses)">Delete</button></td></tr>`).join("")}</table></div>`}
 async function addE(){if(!en.value||!(+ea.value>0))return alert("Name and amount required");await api("/expenses","POST",{name:en.value,category:ec.value,amount:+ea.value,date:ed.value,method:em.value,notes:eo.value});Expenses()}
 if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');
 start();
