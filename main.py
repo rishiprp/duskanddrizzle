@@ -31,6 +31,7 @@ def init():
     CREATE TABLE IF NOT EXISTS order_items(id SERIAL PRIMARY KEY, order_id INTEGER REFERENCES orders(id), product_id INTEGER, name TEXT, qty INTEGER, price DOUBLE PRECISION, cost DOUBLE PRECISION);
     CREATE TABLE IF NOT EXISTS expenses(id SERIAL PRIMARY KEY, name TEXT, category TEXT, amount DOUBLE PRECISION, date TEXT, method TEXT, notes TEXT)""".split(";"):
         c.execute(q)
+    c.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT")
     if not c.execute("SELECT 1 FROM products").fetchone():
         for n in ["Chocolate Strawberry","Chocolate Pineapple","Cold Coco","Cold Coffee","Strawberry Iced Latte","Brownie Strawberry Bowl"]:
             c.execute("INSERT INTO products(name,price,cost) VALUES(?,?,?)",(n,0,0))
@@ -49,7 +50,7 @@ def auth(authorization: str = Header(None)):
     if not ok: raise HTTPException(401, "Not authorised")
 
 class Login(BaseModel): username: str; password: str
-class Product(BaseModel): name: str; category: str = "Drinks"; price: float; cost: float = 0; active: bool = True
+class Product(BaseModel): name: str; category: str = "Drinks"; price: float; cost: float = 0; active: bool = True; image: Optional[str] = None
 class Item(BaseModel): product_id: int; qty: int
 class Order(BaseModel):
     idem: str; items: list[Item]; discount: float = 0; payment: str = "Cash"
@@ -70,14 +71,14 @@ def products():
 @app.post("/api/products", dependencies=[Depends(auth)])
 def add_product(p: Product):
     c = db()
-    try: c.execute("INSERT INTO products(name,category,price,cost,active) VALUES(?,?,?,?,?)",(p.name,p.category,p.price,p.cost,int(p.active))); c.commit()
+    try: c.execute("INSERT INTO products(name,category,price,cost,active,image) VALUES(?,?,?,?,?,?)",(p.name,p.category,p.price,p.cost,int(p.active),p.image)); c.commit()
     except psycopg2.IntegrityError: c.rollback(); raise HTTPException(400, "Product already exists")
     finally: c.close()
     return {"ok": True}
 
 @app.put("/api/products/{pid}", dependencies=[Depends(auth)])
 def edit_product(pid: int, p: Product):
-    c = db(); c.execute("UPDATE products SET name=?,category=?,price=?,cost=?,active=? WHERE id=?",(p.name,p.category,p.price,p.cost,int(p.active),pid)); c.commit(); c.close(); return {"ok": True}
+    c = db(); c.execute("UPDATE products SET name=?,category=?,price=?,cost=?,active=?,image=COALESCE(?,image) WHERE id=?",(p.name,p.category,p.price,p.cost,int(p.active),p.image,pid)); c.commit(); c.close(); return {"ok": True}
 
 @app.delete("/api/products/{pid}", dependencies=[Depends(auth)])
 def del_product(pid: int):
@@ -88,7 +89,7 @@ def new_order(o: Order):
     if not o.items: raise HTTPException(400, "Add at least one item")
     c = db()
     try:
-        dup = c.execute("SELECT order_no FROM orders WHERE idem=?",(o.idem,)).fetchone()
+        dup = c.execute("SELECT id FROM orders WHERE idem=?",(o.idem,)).fetchone()
         if dup: return {"order_no": dup[0], "duplicate": True}
         lines, sub = [], 0
         for i in o.items:
@@ -103,7 +104,7 @@ def new_order(o: Order):
             (no,o.idem,now.isoformat(timespec="seconds"),sub,o.discount,round(sub-o.discount,2),o.payment,o.customer,o.note)).fetchone()[0]
         for p,q in lines:
             c.execute("INSERT INTO order_items(order_id,product_id,name,qty,price,cost) VALUES(?,?,?,?,?,?)",(cur,p["id"],p["name"],q,p["price"],p["cost"]))
-        c.commit(); return {"order_no": no, "total": round(sub-o.discount,2)}
+        c.commit(); return {"order_no": cur, "total": round(sub-o.discount,2)}
     except Exception:
         c.rollback(); raise
     finally: c.close()
@@ -111,7 +112,7 @@ def new_order(o: Order):
 @app.get("/api/orders", dependencies=[Depends(auth)])
 def orders(q: str = "", day: str = ""):
     c = db()
-    rows = c.execute("SELECT * FROM orders WHERE order_no LIKE ? AND created_at LIKE ? ORDER BY id DESC LIMIT 200",(f"%{q}%", f"{day}%")).fetchall()
+    rows = c.execute("SELECT * FROM orders WHERE (? = '' OR CAST(id AS TEXT) = ?) AND created_at LIKE ? ORDER BY id DESC LIMIT 1000",(q.strip(), q.strip(), f"{day}%")).fetchall()
     out = []
     for r in rows:
         d = dict(r); d["items"] = [dict(i) for i in c.execute("SELECT name,qty,price FROM order_items WHERE order_id=?",(r["id"],))]; out.append(d)
@@ -143,11 +144,11 @@ def agg(c, s, e):
 def summary(start: str, end: str):
     c = db(); rev, n, items, exp = agg(c, start, end)
     days = {}
-    for r in c.execute("SELECT date(created_at) d, SUM(total) t FROM orders WHERE status='completed' AND date(created_at) BETWEEN ? AND ? GROUP BY d",(start,end)): days.setdefault(r["d"],[0,0])[0] = r["t"]
-    for r in c.execute("SELECT expenses.date d, SUM(amount) a FROM expenses WHERE date BETWEEN ? AND ? GROUP BY d",(start,end)): days.setdefault(r["d"],[0,0])[1] = r["a"]
+    for r in c.execute("SELECT date(created_at) d, SUM(total) t FROM orders WHERE status='completed' AND date(created_at) BETWEEN ? AND ? GROUP BY d",(start,end)): days.setdefault(str(r["d"]),[0,0])[0] = r["t"]
+    for r in c.execute("SELECT expenses.date d, SUM(amount) a FROM expenses WHERE date BETWEEN ? AND ? GROUP BY d",(start,end)): days.setdefault(str(r["d"]),[0,0])[1] = r["a"]
     prods = [dict(r) for r in c.execute("""SELECT i.name, SUM(i.qty) qty, SUM(i.qty*i.price) revenue, SUM(i.qty*(i.price-i.cost)) profit FROM order_items i JOIN orders o ON o.id=i.order_id
         WHERE o.status='completed' AND date(o.created_at) BETWEEN ? AND ? GROUP BY i.name ORDER BY qty DESC""",(start,end))]
-    allrev, alln, _, allexp = agg(c, "0000-01-01", "9999-12-31"); c.close()
+    allrev, alln, _, allexp = agg(c, "1900-01-01", "2999-12-31"); c.close()
     return {"sales": rev, "orders": n, "items": items, "expenses": exp, "profit": round(rev-exp,2),
         "aov": round(rev/n,2) if n else 0, "best": prods[0]["name"] if prods else "-",
         "profit_pct": round((rev-exp)/rev*100,1) if rev else 0, "expense_pct": round(exp/rev*100,1) if rev else 0,
@@ -158,7 +159,7 @@ def summary(start: str, end: str):
 def export():
     c = db(); buf = io.StringIO(); w = csv.writer(buf)
     w.writerow(["Order","Date","Subtotal","Discount","Total","Payment","Customer","Status"])
-    for r in c.execute("SELECT order_no,created_at,subtotal,discount,total,payment,customer,status FROM orders"): w.writerow(list(r))
+    for r in c.execute("SELECT id,created_at,subtotal,discount,total,payment,customer,status FROM orders"): w.writerow(list(r))
     c.close(); buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv")
 
