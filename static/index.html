@@ -1,0 +1,74 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dusk &amp; Drizzle</title><link rel="manifest" href="/static/manifest.json"><meta name="theme-color" content="#49111C"><link rel="apple-touch-icon" href="/static/icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--black:#0A0908;--sienna:#49111C;--cult:#F2F4F3;--grullo:#A9927D;--umber:#5E503F}
+*{box-sizing:border-box}body{margin:0;font:15px system-ui,sans-serif;background:var(--cult);color:var(--black);display:flex;min-height:100vh}
+nav{background:var(--black);width:200px;padding:16px 8px;flex-shrink:0}nav h2{color:var(--grullo);margin:0 8px 16px;font-size:18px}
+nav a{display:block;color:var(--cult);padding:10px 12px;border-radius:6px;cursor:pointer}nav a.on{background:var(--sienna)}
+main{flex:1;padding:20px;min-width:0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:12px 0}
+.card{background:#fff;border-radius:8px;padding:14px;border:1px solid #ddd}.card b{display:block;font-size:20px;color:var(--sienna)}
+button{background:var(--sienna);color:#fff;border:0;border-radius:6px;padding:10px 14px;cursor:pointer;font-size:15px}button.alt{background:var(--umber)}
+input,select{padding:9px;border:1px solid var(--grullo);border-radius:6px;font-size:15px;max-width:100%}
+table{width:100%;border-collapse:collapse;background:#fff}td,th{padding:8px;border-bottom:1px solid #eee;text-align:left}
+.pbtn{padding:18px;font-size:16px;background:var(--umber);margin:4px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+#login{margin:auto;width:300px}@media(max-width:700px){body{flex-direction:column}nav{width:100%;display:flex;overflow:auto}nav h2{display:none}nav a{white-space:nowrap}}
+</style></head><body>
+<div id="login" class="card"><h2>Dusk &amp; Drizzle</h2><div class="row"><input id="u" placeholder="Username"><input id="p" type="password" placeholder="Password"><button onclick="login()">Sign in</button></div><div id="lerr" style="color:red"></div></div>
+<nav style="display:none"><h2>Dusk &amp; Drizzle</h2></nav><main style="display:none"></main>
+<script>
+let T=localStorage.t||"",view="Dashboard",cart={},idem=crypto.randomUUID(),charts=[];
+const $=s=>document.querySelector(s),R=n=>"₹"+Number(n||0).toLocaleString("en-IN",{maximumFractionDigits:2}),
+D=s=>s?s.slice(0,10).split("-").reverse().join("/"):"",iso=d=>d.toISOString().slice(0,10);
+async function api(p,m="GET",b){const r=await fetch("/api"+p,{method:m,headers:{"Content-Type":"application/json",Authorization:"Bearer "+T},body:b?JSON.stringify(b):undefined});
+ if(r.status==401){logout();throw 0}if(!r.ok){alert((await r.json()).detail||"Error");throw 0}return r}
+async function login(){const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:$("#u").value,password:$("#p").value})});
+ if(!r.ok)return $("#lerr").textContent="Wrong credentials";T=(await r.json()).token;localStorage.t=T;start()}
+function logout(){localStorage.t="";location.reload()}
+function start(){if(!T)return;$("#login").style.display="none";$("nav").style.display=$("main").style.display="";
+ $("nav").innerHTML='<h2>Dusk &amp; Drizzle</h2>'+["Dashboard","New Order","Orders","Products","Expenses"].map(v=>`<a onclick="go('${v}')" class="${v==view?"on":""}">${v}</a>`).join("")+'<a onclick="logout()">Logout</a>';go(view)}
+function go(v){view=v;start2()}function start2(){$("nav").querySelectorAll("a").forEach(a=>a.classList.toggle("on",a.textContent==view));({Dashboard,"New Order":NewOrder,Orders,Products,Expenses})[view]()}
+function range(k){const t=new Date(),s=new Date(t),e=new Date(t),dow=(t.getDay()+6)%7;
+ if(k=="yesterday"){s.setDate(s.getDate()-1);e.setDate(e.getDate()-1)}
+ if(k=="week")s.setDate(s.getDate()-dow);if(k=="month")s.setDate(1);if(k=="year"){s.setMonth(0,1)}return[iso(s),iso(e)]}
+async function Dashboard(a="today",cs,ce){const[s,e]=a=="custom"?[cs,ce]:range(a);const d=await(await api(`/summary?start=${s}&end=${e}`)).json();
+ const K=[["Sales",R(d.sales)],["Orders",d.orders],["Expenses",R(d.expenses)],["Net Profit",R(d.profit)],["Items Sold",d.items],["Avg Order",R(d.aov)],["Best Seller",d.best],["Profit %",d.profit_pct+"%"],["Expense %",d.expense_pct+"%"],["All-time Revenue",R(d.all_revenue)],["All-time Expenses",R(d.all_expenses)],["All-time Profit",R(d.all_profit)]];
+ $("main").innerHTML=`<div class="row">${["today","yesterday","week","month","year"].map(x=>`<button class="alt" onclick="Dashboard('${x}')">${x}</button>`).join("")}
+ <input type="date" id="cs" value="${s}"><input type="date" id="ce" value="${e}"><button onclick="Dashboard('custom',cs.value,ce.value)">Apply</button></div>
+ <div class="grid">${K.map(([k,v])=>`<div class="card">${k}<b>${v}</b></div>`).join("")}</div>
+ <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div></div>`;
+ charts.forEach(c=>c.destroy());const L=d.series.map(x=>D(x.d));
+ charts=[new Chart(c1,{type:"bar",data:{labels:L,datasets:[{label:"Sales",data:d.series.map(x=>x.sales),backgroundColor:"#49111C"},{label:"Expenses",data:d.series.map(x=>x.expenses),backgroundColor:"#A9927D"}]}}),
+ new Chart(c2,{type:"line",data:{labels:L,datasets:[{label:"Daily profit",data:d.series.map(x=>x.profit),borderColor:"#5E503F"}]}})]}
+async function NewOrder(){const P=(await(await api("/products")).json()).filter(p=>p.active);
+ const tot=()=>P.reduce((s,p)=>s+(cart[p.id]||0)*p.price,0);
+ $("main").innerHTML=`<h2>New Order</h2><div>${P.map(p=>`<button class="pbtn" onclick="cart[${p.id}]=(cart[${p.id}]||0)+1;NewOrder()">${p.name}<br>${R(p.price)}</button>`).join("")}</div>
+ <table>${P.filter(p=>cart[p.id]).map(p=>`<tr><td>${p.name}</td><td><button onclick="cart[${p.id}]--;if(!cart[${p.id}])delete cart[${p.id}];NewOrder()">−</button> ${cart[p.id]} </td><td>${R(cart[p.id]*p.price)}</td></tr>`).join("")}</table>
+ <div class="row"><input id="disc" type="number" min="0" placeholder="Discount ₹" value="0"><select id="pay"><option>Cash</option><option>UPI</option><option>Other</option></select>
+ <input id="cust" placeholder="Customer (optional)"><input id="note" placeholder="Note (optional)"></div>
+ <h3>Subtotal ${R(tot())}</h3><button id="sub" onclick="submitOrder()">Submit Order</button>`}
+async function submitOrder(){const items=Object.entries(cart).map(([k,v])=>({product_id:+k,qty:v}));$("#sub").disabled=true;
+ try{const r=await(await api("/orders","POST",{idem,items,discount:+disc.value||0,payment:pay.value,customer:cust.value||null,note:note.value||null})).json();
+ alert("Order saved: "+r.order_no);cart={};idem=crypto.randomUUID();NewOrder()}catch{$("#sub").disabled=false}}
+async function Orders(q="",day=""){const o=await(await api(`/orders?q=${q}&day=${day}`)).json();
+ $("main").innerHTML=`<h2>Orders</h2><div class="row"><input id="q" placeholder="Order ID" value="${q}"><input id="dy" type="date" value="${day}"><button onclick="Orders(q.value,dy.value)">Search</button><button class="alt" onclick="exportCsv()">Export CSV</button></div>
+ <table><tr><th>ID</th><th>Date</th><th>Items</th><th>Total</th><th>Pay</th><th></th></tr>${o.map(x=>`<tr style="${x.status=="cancelled"?"opacity:.5":""}"><td>${x.order_no}</td><td>${D(x.created_at)} ${x.created_at.slice(11,16)}</td><td>${x.items.map(i=>i.qty+"× "+i.name).join(", ")}</td><td>${R(x.total)}</td><td>${x.payment}</td>
+ <td>${x.status=="completed"?`<button class="alt" onclick="cancelO(${x.id})">Cancel</button>`:"cancelled"} <button onclick='receipt(${JSON.stringify(x)})'>Receipt</button></td></tr>`).join("")}</table>`}
+async function cancelO(id){if(confirm("Cancel this order?")){await api(`/orders/${id}/cancel`,"POST");Orders()}}
+function receipt(x){const w=open("","_blank");w.document.write(`<pre style="font:14px monospace">Dusk & Drizzle\n${x.order_no}  ${D(x.created_at)} ${x.created_at.slice(11,16)}\n\n${x.items.map(i=>`${i.qty} x ${i.name}  ₹${i.qty*i.price}`).join("\n")}\n\nDiscount ₹${x.discount}\nTOTAL ₹${x.total} (${x.payment})</pre>`);w.print()}
+async function exportCsv(){const b=await(await api("/export/orders.csv")).blob(),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="orders.csv";a.click()}
+async function Products(){const P=await(await api("/products")).json();
+ $("main").innerHTML=`<h2>Products</h2><table><tr><th>Name</th><th>Category</th><th>Price ₹</th><th>Cost ₹</th><th>Active</th><th></th></tr>${P.map(p=>`<tr><td><input id="n${p.id}" value="${p.name}"></td><td><input id="c${p.id}" value="${p.category}" size=8></td>
+ <td><input id="p${p.id}" type="number" value="${p.price}" style="width:80px"></td><td><input id="k${p.id}" type="number" value="${p.cost}" style="width:80px"></td><td><input id="a${p.id}" type="checkbox" ${p.active?"checked":""}></td>
+ <td><button onclick="saveP(${p.id})">Save</button> <button class="alt" onclick="api('/products/${p.id}','DELETE').then(Products)">Delete</button></td></tr>`).join("")}</table>
+ <h3>Add product</h3><div class="row"><input id="nn" placeholder="Name"><input id="nc" placeholder="Category" value="Drinks"><input id="np" type="number" placeholder="Price"><input id="nk" type="number" placeholder="Cost"><button onclick="addP()">Add</button></div>`}
+async function saveP(i){await api("/products/"+i,"PUT",{name:$("#n"+i).value,category:$("#c"+i).value,price:+$("#p"+i).value,cost:+$("#k"+i).value,active:$("#a"+i).checked});Products()}
+async function addP(){await api("/products","POST",{name:nn.value,category:nc.value,price:+np.value,cost:+nk.value});Products()}
+const CATS=["Raw Materials","Fruits","Chocolate and Syrup","Milk and Dairy Products","Packaging","Transportation","Stall Rent","Electricity","Marketing","Equipment","Other Expenses"];
+async function Expenses(){const E=await(await api("/expenses")).json();
+ $("main").innerHTML=`<h2>Expenses</h2><div class="row"><input id="en" placeholder="Name"><select id="ec">${CATS.map(c=>`<option>${c}</option>`)}</select><input id="ea" type="number" placeholder="₹ Amount"><input id="ed" type="date" value="${iso(new Date())}"><select id="em"><option>Cash</option><option>UPI</option><option>Other</option></select><input id="eo" placeholder="Notes"><button onclick="addE()">Add</button></div>
+ <table><tr><th>Date</th><th>Name</th><th>Category</th><th>Amount</th><th></th></tr>${E.map(e=>`<tr><td>${D(e.date)}</td><td>${e.name}</td><td>${e.category}</td><td>${R(e.amount)}</td><td><button class="alt" onclick="api('/expenses/${e.id}','DELETE').then(Expenses)">Delete</button></td></tr>`).join("")}</table>`}
+async function addE(){if(!en.value||!(+ea.value>0))return alert("Name and amount required");await api("/expenses","POST",{name:en.value,category:ec.value,amount:+ea.value,date:ed.value,method:em.value,notes:eo.value});Expenses()}
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');
+start();
+</script></body></html>
